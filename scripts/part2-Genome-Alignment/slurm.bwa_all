@@ -1,0 +1,13 @@
+#!/bin/bash
+##SBATCH -J bwa24  #Slurm job name
+#SBATCH --mail-user=njutangjihong@gmail.com 
+#SBATCH --mail-type=end
+##SBATCH -p x-gpu-share
+##SBATCH -o tra_MD.out
+##SBATCH -e tra_MD.err
+##SBATCH -N 1 -n 24
+#SBATCH --cpus-per-task=20
+#SBATCH --exclusive
+
+perl run_bwa_mapping.pl list_SP_fq_bwa.txt ../all_fq $1 $2 2>./log/log.bwa_$1_$2
+
