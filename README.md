@@ -10,6 +10,7 @@
     - [0.2.1 Installing Conda Environment](#021-installing-conda-environment)
     - [0.2.2 Installing Homebrew (Alternative choice)](#022-installing-homebrew-alternative-choice)
     - [0.2.3 Setting Up the Folder Structure](#023-setting-up-the-folder-structure)
+    - [0.2.4 Creating Cohort Index Files](#024-creating-cohort-index-files)
 - [Part1 Sequencing Data Quality Control](#part1-sequencing-data-quality-control)
 - [Part2 Genome Alignment](#part2-genome-alignment)
 - [Part3 Somatic Mutation Calling](#part3-somatic-mutation-calling)
@@ -148,6 +149,30 @@ The folder structure used in this pipeline will be summarized here.
   For other users, the reference genomes can be downloaded from the following pages: [hg19](https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/), [hg38](https://gdc.cancer.gov/about-data/gdc-data-processing/gdc-reference-files)
 - Two different versions of reference genome are included in this pipeline. They are both used to generate different versions of genome alignment result files(BAMs). Afterwards, the bams are used differently for following mutation calling and CNV analysis module based on the reference genome version requirements for different tools.
 - For the Somatic Mutation calling and CNV analysis modules, detailed folder arrangements will be explained in [Part3](#part3-somatic-mutation-calling) and [Part4](#part4-copy-number-variation-analysis).
+
+### 0.2.4 Creating Cohort Index Files
+In order to facilitate the cohort data management and parallel processing, we need to create two index files for the WES/WGS sequencing data in this whole pipeline. Both index files are simple .txt files containing the basic naming information for all the sequencing data. 
+
+The first file is used for Sequencing Data QC and Genome Aligenment modules, and it contains three columns, representing row number(0-index), raw name prefix of fastq files, and changed name prefix of bam files, respectively.
+
+Below is the example format, it is expected to contain index rows for both Blood(B) and Tumor(T) samples in this index file. It is recommended to label the blood and tumor samples in specific symbols, such as B and T after the patient number.
+
+The first column is used for easier arrangement of parallel computing, and detailed information will be provided in the next subsection. The second column is the original name prefix of the fastq files, and it is highly recommended to rename your fastq files in your own style but noted them well in this index file. 
+The demo index file could be found [here](scripts/list_SP_fq_bwa.txt)
+```bash
+0   P001_B    P001_B_WES_hg38
+1   P002_B    P002_B_WES_hg38
+2   P003_B    P003_B_WES_hg38
+3   P004_B    P004_B_WES_hg38
+4   P005_B    P005_B_WES_hg38
+5   P001_T    P001_T_WES_hg38
+6   P002_T    P002_T_WES_hg38
+7   P003_T    P003_T_WES_hg38
+8   P004_T    P004_T_WES_hg38
+9   P005_T    P005_T_WES_hg38
+...
+```
+
 # Part1 Sequencing Data Quality Control
 
 # Part2 Genome Alignment
