@@ -153,12 +153,17 @@ The folder structure used in this pipeline will be summarized here.
 ### 0.2.4 Creating Cohort Index Files
 In order to facilitate the cohort data management and parallel processing, we need to create two index files for the WES/WGS sequencing data in this whole pipeline. Both index files are simple .txt files containing the basic naming information for all the sequencing data. 
 
+**Index File 1st**
+
 The first file is used for Sequencing Data QC and Genome Aligenment modules, and it contains three columns, representing row number(0-index), raw name prefix of fastq files, and changed name prefix of bam files, respectively.
 
 Below is the example format, it is expected to contain index rows for both Blood(B) and Tumor(T) samples in this index file. It is recommended to label the blood and tumor samples in specific symbols, such as B and T after the patient number.
 
-The first column is used for easier arrangement of parallel computing, and detailed information will be provided in the next subsection. The second column is the original name prefix of the fastq files, and it is highly recommended to rename your fastq files in your own style but noted them well in this index file. 
-The demo index file could be found [here](scripts/list_SP_fq_bwa.txt)
+The first column is used for easier arrangement of parallel computing, and detailed information will be provided in the next subsection. The second column is the original name prefix of the fastq files, 
+and it is highly recommended to rename your fastq files in your own style but noted them well in this index file. 
+The third column is the changed name prefix you would like to name your bam files. It is highly recommended to contain DNA-seq methods(WES/WGS) and reference genome version(hg19/hg38) in the prefix for further confirmation.
+
+The demo index file could be found [here](scripts/list_SP_fq_bwa.txt). It is used for the demo SP project data and contains 47 patients, 94 sequencing data(B + T) files.
 ```bash
 0   P001_B    P001_B_WES_hg38
 1   P002_B    P002_B_WES_hg38
@@ -173,6 +178,21 @@ The demo index file could be found [here](scripts/list_SP_fq_bwa.txt)
 ...
 ```
 
+**Index File 2nd**
+
+The second file is used for Somatic Mutation Calling and CNV Analysis modules, and it contains only two columns, representing row number(0-index), and patient prefix resepectively.
+The second index file only needs to contain one index row for each patient, which is different to the first one. 
+
+Below is the example format and the demo index file could be found [here](scripts/list_SP_savi_CNV.txt).
+
+```bash
+0   P001
+1   P002
+2   P003
+4   P004
+5   P005
+...
+```
 # Part1 Sequencing Data Quality Control
 
 # Part2 Genome Alignment
