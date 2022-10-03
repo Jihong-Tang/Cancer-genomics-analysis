@@ -12,9 +12,15 @@
     - [0.2.3 Setting Up the Folder Structure](#023-setting-up-the-folder-structure)
     - [0.2.4 Creating Cohort Index Files](#024-creating-cohort-index-files)
 - [Part1 Sequencing Data Quality Control](#part1-sequencing-data-quality-control)
-  - [1.1 Setting Up Tools and Environment](#11-setting-up-tools-and-environment)
+  - [1.1 Setting Up Tools](#11-setting-up-tools)
+  - [1.2 Automatic QC with fastp](#12-automatic-qc-with-fastp)
 - [Part2 Genome Alignment](#part2-genome-alignment)
+  - [2.1 Setting Up Tools](#21-setting-up-tools)
+  - [2.2 Genome Alignment with bwa](#22-genome-alignment-with-bwa)
+  - [2.3 Mark Duplicates with Picard](#23-mark-duplicates-with-picard)
 - [Part3 Somatic Mutation Calling](#part3-somatic-mutation-calling)
+  - [3.1 Setting Up Tools](#31-setting-up-tools)
+  - [3.2 Somatic Mutations Calling with SAVI](#32-somatic-mutations-calling-with-savi)
 - [Part4 Copy Number Variation Analysis](#part4-copy-number-variation-analysis)
 - [Author](#author)
 - [Reference](#reference)
@@ -195,7 +201,7 @@ Below is the example format and the demo index file could be found [here](script
 ...
 ```
 # Part1 Sequencing Data Quality Control
-## 1.1 Setting Up Tools and Environment
+## 1.1 Setting Up Tools
 The main bioinformatics tool used in this module is fastp. The fastp is a tool designed to provide fast all-in-one preprocessing for FastQ files.
 It can automatically filter reads, detect reads adapters, make adapter trimming and output QC results based on the demand. It covers the functions of well known QC tools like FastQC and Trim Galero, and makes the whole preprocessing work automatically in one step, which is very convenient.
 More details about fastp could be found in their [user manual page](https://github.com/OpenGene/fastp). 
@@ -217,10 +223,397 @@ wget http://opengene.org/fastp/fastp.0.23.1
 mv fastp.0.23.1 fastp
 chmod a+x ./fastp
 ```
+
+## 1.2 Automatic QC with fastp
+In order to facilitate the 
+```bash
+#!/usr/bin/bash
+
+rawName=$1
+cleanName=$2_fp
+
+#mkdir -p qc_res
+
+fastp -w 2 -i ./$rawName\.R1.fq.gz -o ./$cleanName\.R1.fq.gz \
+ -I ./$rawName\.R2.fq.gz -O ./$cleanName\.R2.fq.gz \
+ -q 15 -u 40 --length_required 45 \
+ --detect_adapter_for_pe \
+ -h ./qc_res/fastp_$cleanName\.html -j ./qc_res/fastp_$cleanName\.json -R ./qc_res/report_$cleanName\.txt
+
+rm ./$rawName\.R1.fq.gz ./$rawName\.R2.fq.gz
+```
+
+```perl
+#!/usr/bin/perl
+
+#please run this job in a new clear fold
+die "usage: perl runfastp.pl <Data_Index> <start> <end> \n" if @ARGV!= 3;
+
+$index_table = $ARGV[0];
+
+
+
+open INDEX, $index_table;
+$i = 0;
+$id = 0;
+while($line = <INDEX>){
+	chomp($line);
+	my @temp=split('\t',$line);
+	$sample[$i][0] = $temp[1];
+	$sample[$i][1] = $temp[2];
+	$i++;
+}
+close INDEX;
+
+#`mkdir Dir_tmp_1`;
+#chdir "./Dir_tmp_1";
+
+$start = $ARGV[1];
+$end = $ARGV[2];
+
+for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
+        `sh ./do_fastp.sh $sample[$j][0] $sample[$j][0]`;
+	$completed_No = $j;
+        print "Job completed!!! No.$completed_No : $sample[$j][1]\t$sample[$j][0]\n\n";
+}
+```
+
+```bash
+#!/bin/bash
+##SBATCH -J bwa24  #Slurm job name
+#SBATCH --mail-user=njutangjihong@gmail.com 
+#SBATCH --mail-type=end
+##SBATCH -p x-gpu-share
+##SBATCH -o tra_MD.out
+##SBATCH -e tra_MD.err
+##SBATCH -N 1 -n 24
+#SBATCH --cpus-per-task=20
+##SBATCH --exclusive
+
+perl runfastp.pl list_SP_fq_bwa.txt $1 $2 2>./log/log.fp_$1_$2
+```
+
+```bash
+sbatch -p x-gpu-share -J fp0 slurm.fp_all 0 23 
+sbatch -p x-gpu-share -J fp24 slurm.fp_all 24 47 
+sbatch -p x-gpu-share -J fp48 slurm.fp_all 48 71
+sbatch -p x-gpu-share -J fp72 slurm.fp_all 72 93 
+```
 # Part2 Genome Alignment
+
+## 2.1 Setting Up Tools
+
+## 2.2 Genome Alignment with bwa
+
+```bash
+#!/usr/bin/bash
+A='WangLab'
+Sample_ID=$1
+FAQ1=$2
+FAQ2=$3
+result=$4
+
+
+echo [Directory] `pwd`
+echo [Machine] `uname -n`
+echo [Start] `date`
+echo [args] $*
+time1=$( date "+%s" )
+
+
+#line_q1=`zcat $FAQ1 | wc -l`
+#line_q2=`zcat $FAQ2 | wc -l`
+
+bwa mem -t 20 -T 0 -R "@RG\tCN:$A\tID:$Sample_ID\tSM:$Sample_ID" /scratch/PI/jgwang/jtangbd/reference/TCGA_GRCh38_bwa_ref/GRCh38.d1.vd1.fa $FAQ1 $FAQ2 2> ./tmp/tmp.$result | samtools view -Sbh1 -@ 8 - -o $result\.bam
+
+#### mapping duplicates
+###counting the num of bam reads
+
+samtools sort -@ 8 -O bam -o $result.sorted.bam -T the_temp_$result $result\.bam
+samtools index $result\.sorted.bam 
+rm $result\.bam
+#rm $FAQ1
+#rm $FAQ2
+#samtools idxstats result_test.sorted.bam |head 
+#samtools view -H /home/qmu/projects/AsianpGBM/TCGAGBM/C484.TCGA-06-6699-10A-01D-1845-08.2_gdc_realn.bam |grep "^@PG"
+#samtools flagstat result_test.sorted.bam
+#samtools view -f 4 result_test.sorted.bam chr7 | wc -l
+#samtools mpileup ../raw_data/results_B_DNA/IGCT_S002_B.sorted.bam -r chr10:63207680 -f /home/dsongad/software/my_lib/STAR_index_hg38_RefSeq_hg38/hg38.fa |head -n20
+
+time2=$( date "+%s" )
+echo [deltat] $(( $time2 - $time1 ))
+echo [End]
+```
+
+```perl
+#!/usr/bin/perl
+
+#please run this job in a new clear fold
+die "usage: perl run_bwa_mapping.pl <Data_Index> <fastq-dir> <START> <END> \n" if @ARGV!= 4;
+
+$index_table = $ARGV[0];
+$root = $ARGV[1];
+
+
+open INDEX, $index_table;
+$i = 0;
+$id = 0;
+while($line = <INDEX>){
+	chomp($line);
+	my @temp=split('\t',$line);
+	$sample[$i][0] = $temp[1];
+	$sample[$i][1] = $temp[2];
+	$i++;
+}
+close INDEX;
+
+#`mkdir Dir_tmp_1`;
+#chdir "./Dir_tmp_1";
+#
+$start = $ARGV[2];
+$end = $ARGV[3];
+
+for($j=$start;$j<=$end;$j++){
+        `sh ./do_bwa_dna.sh $sample[$j][0] $root/$sample[$j][0]_fp.R1.fq.gz $root/$sample[$j][0]_fp.R2.fq.gz $sample[$j][1]`;
+	$completed_No = $j;
+        print "bwa-MEM completed!!! No.$completed_No : $sample[$j][1]\t$sample[$j][0]\n";
+}
+#chdir "../";
+```
+
+```bash
+#!/bin/bash
+##SBATCH -J bwa24  #Slurm job name
+#SBATCH --mail-user=njutangjihong@gmail.com 
+#SBATCH --mail-type=end
+##SBATCH -p x-gpu-share
+##SBATCH -o tra_MD.out
+##SBATCH -e tra_MD.err
+##SBATCH -N 1 -n 24
+#SBATCH --cpus-per-task=20
+#SBATCH --exclusive
+
+perl run_bwa_mapping.pl list_SP_fq_bwa.txt ../all_fq $1 $2 2>./log/log.bwa_$1_$2
+```
+
+```bash
+sbatch -p x-gpu-share -J bwa0 slurm.bwa_all 0 23 
+sbatch -p x-gpu-share -J bwa24 slurm.bwa_all 24 47 
+sbatch -p x-gpu-share -J bwa48 slurm.bwa_all 48 71
+sbatch -p x-gpu-share -J bwa72 slurm.bwa_all 72 93 
+```
+## 2.3 Mark Duplicates with Picard
+
+```bash
+#!/usr/bin/bash
+
+#set -euxo pipefail
+#export LD_LIBRARY_PATH=/home/qmu/tools/lib:/opt/intel/advisor_xe_2016.1.40.463413/lib64:/home/qmu/tools/xz-5.2.3/tmp/lib 
+#picard=/home/share/jgwang/softwares/picard/build/libs/picard.jar
+picard=/scratch/PI/jgwang/dsongad/software/Picard/picard.jar
+
+NAME=$1
+
+mkdir md_tmp/tmp_$NAME
+
+java -Djava.io.tmpdir=md_tmp/tmp_$NAME \
+	-Xmx120g -XX:+UseParallelGC -XX:ParallelGCThreads=4 \
+	 -jar ${picard} MarkDuplicates \
+	INPUT=${NAME}.sorted.bam \
+	OUTPUT=${NAME}.sorted.MD.bam \
+	METRICS_FILE=./md_metrix/${NAME}.metrics.txt \
+	ASSUME_SORTED=true \
+	REMOVE_DUPLICATES=true \
+	VALIDATION_STRINGENCY=LENIENT
+
+rm ${NAME}.sorted.bam
+rm ${NAME}.sorted.bam.bai
+samtools index ${NAME}.sorted.MD.bam
+#rm ${NAME}.sorted.MD.bam.txt
+```
+
+```perl
+#!/usr/bin/perl
+
+#please run this job in a new clear fold
+die "usage: perl run_mark_duplicates.pl <Data_Index> <fastq-dir> <START> <END> \n" if @ARGV!= 4;
+
+$index_table = $ARGV[0];
+$root = $ARGV[1];
+
+
+open INDEX, $index_table;
+$i = 0;
+$id = 0;
+while($line = <INDEX>){
+	chomp($line);
+	my @temp=split('\t',$line);
+	$sample[$i][0] = $temp[1];
+	$sample[$i][1] = $temp[2];
+	$i++;
+}
+close INDEX;
+
+#`mkdir Dir_tmp_1`;
+#chdir "./Dir_tmp_1";
+#
+$start = $ARGV[2];
+$end = $ARGV[3];
+
+for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
+	`sh ./do_mark_duplicates.sh $sample[$j][1]`;
+	$completed_No = $j;
+        print "MarkingDup completed!!! No.$completed_No : $sample[$j][0]\t$sample[$j][1]\n\n";
+}
+#chdir "../";
+```
+
+```bash
+#!/bin/bash
+##SBATCH -J md24  #Slurm job name
+#SBATCH --mail-user=njutangjihong@gmail.com 
+#SBATCH --mail-type=end
+##SBATCH -p x-gpu-share
+##SBATCH -o tra_MD.out
+##SBATCH -e tra_MD.err
+##SBATCH -N 1 -n 24
+#SBATCH --cpus-per-task=20
+#SBATCH --exclusive
+
+perl run_mark_duplicates.pl list_SP_fq_bwa.txt ./ $1 $2 2>./log/log.md_$1_$2
+```
+
+```bash
+sbatch -p x-gpu-share -J md0 slurm.md_all 0 23 
+sbatch -p x-gpu-share -J md24 slurm.md_all 24 47 
+sbatch -p x-gpu-share -J md48 slurm.md_all 48 71
+sbatch -p x-gpu-share -J md72 slurm.md_all 72 93 
+```
 
 # Part3 Somatic Mutation Calling 
 
+## 3.1 Setting Up Tools
+
+## 3.2 Somatic Mutations Calling with SAVI
+
+```bash
+#!/bin/bash
+
+export LIBRARY_PATH=/scratch/PI/jgwang/dsongad/software/ncurses/lib/:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/scratch/PI/jgwang/dsongad/software/ncurses/lib/
+export PATH=/scratch/PI/jgwang/dsongad/software/samtools-1.2:$PATH
+export PATH=$PATH:/scratch/PI/jgwang/dsongad/software/snpEff
+export LIBRARY_PATH=/scratch/PI/jgwang/dsongad/software/ncurses/lib/:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/scratch/PI/jgwang/dsongad/software/ncurses/lib/
+#conda activate savi_hg38_py2.7
+
+OUTPUT=$1
+BD=$2
+T1=$3
+
+
+V=/scratch/PI/jgwang/dsongad/software/my_lib/tmp_vcf_lib
+S=/scratch/PI/jgwang/dsongad/IGCT/run_savi/SAVI
+R=/scratch/PI/jgwang/dsongad/software/my_lib/star_genome_d1_vd1_gtfv22/GRCh38.d1.vd1.fa
+
+for i in {1..22} {X,Y,M}; do
+	mkdir -p ${OUTPUT}/${i}
+        ${S}/savi_SONG_allregion.py --bams ${BD},${T1} \
+                --names Nor,T1 \
+                --ann GRCh38.p7.RefSeq --memory 40 \
+                --ref ${R} -c 2:1 \
+                --region chr${i} -v --superverbose \
+                --noncoding --mapqual 20 --mindepth 4 \
+                --outputdir ${OUTPUT}/${i} \
+                --annvcf ${V}/Cosmic_2020_hg38/Song_hg38_Cosmic.sorted.vcf.gz,${V}/Cosmic_2020_hg38/Song_hg38_ClinVar.sorted.vcf.gz,${V}/Cosmic_2020_hg38/Song_hg38_PancancerGermline.sorted.vcf.gz,${V}/Cosmic_2020_hg38/Song_hg38_cbio.vcf.gz,${V}/normal_hg38/Song_hg38_All_SNP.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_TOPMED.sorted.vcf.gz,${V}/normal_hg38/IGCTfamB.sorted.vcf.gz,${V}/normal_hg38/IGCTpatB.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_GATKnormal.vcf.gz,${V}/normal_hg38/Song_hg38_HGDP_1KG.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_MuTectPON.vcf.gz,${V}/normal_hg38/Song_hg38_dbSNP_ALFA.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_gnomAD.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_219normals.vcf.gz,${V}/normal_hg38/Song_China_map.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_ExAC.sorted.vcf.gz,${V}/normal_hg38/Song_hg38_NGDC_SNP.vcf.gz,${V}/normal_hg38/Song_hg38_meganormal.vcf.gz 1> ${OUTPUT}/${i}/err.out 2>${OUTPUT}/${i}/err.log &
+done
+wait
+
+echo SAVI done!
+
+echo Start merging...
+
+O1=${OUTPUT}/merge.report.coding.PDfilter.txt
+O2=${OUTPUT}/merge.report.coding.txt
+
+
+head -n 1 ${OUTPUT}/1/report/report.coding.PDfilter.txt > ${O1}
+head -n 1 ${OUTPUT}/1/report/report.coding.txt > ${O2}
+
+for i in {1..22} {X,Y,M}; do
+        F1=${OUTPUT}/${i}/report/report.coding.PDfilter.txt
+	F2=${OUTPUT}/${i}/report/report.coding.txt
+	
+        if [ -e ${F1} ]; then
+                tail -n +2 ${F1} >> ${O1}
+        else
+                echo ${F1} does not exist
+        fi
+
+        if [ -e ${F2} ]; then
+                tail -n +2 ${F2} >> ${O2}
+        else
+                echo ${F2} does not exist
+        fi
+
+done
+```
+
+```perl
+#!/usr/bin/perl
+
+#please run this job in a new clear fold
+die "usage: perl run_savi.pl <Data_Index> <START> <END> \n" if @ARGV!= 3;
+
+$index_table = $ARGV[0];
+
+
+open INDEX, $index_table;
+$i = 0;
+$id = 0;
+while($line = <INDEX>){
+	chomp($line);
+	my @temp=split('\t',$line);
+	$sample[$i][0] = $temp[1];
+	$i++;
+}
+close INDEX;
+
+#`mkdir Dir_tmp_1`;
+#chdir "./Dir_tmp_1";
+#
+$start = $ARGV[1];
+$end = $ARGV[2];
+
+for($j=$start;$j<=$end;$j++){
+	`sh do_savi_WES_2sample_GRCh38.p7.RefSeq.sh  $sample[$j][0] ../all_mapping_hg38/$sample[$j][0]_B_WES_hg38.sorted.MD.bam ../all_mapping_hg38/$sample[$j][0]_T_WES_hg38.sorted.MD.bam`;
+	$completed_No = $j;
+        print "bwa-MEM completed!!! No.$completed_No : $sample[$j][0]\n";
+}
+#chdir "../";
+```
+
+```bash
+#!/bin/bash
+##SBATCH -J savi24  #Slurm job name
+#SBATCH --mail-user=njutangjihong@gmail.com 
+#SBATCH --mail-type=end
+##SBATCH -p x-gpu-share
+##SBATCH -o tra_MD.out
+##SBATCH -e tra_MD.err
+##SBATCH -N 1 -n 24
+#SBATCH --cpus-per-task=20
+#SBATCH --exclusive
+
+perl run_savi.pl list_SP_savi_CNV.txt $1 $2 2> log/log.savi_$1_$2
+```
+
+```bash
+sbatch -p x-gpu-share -J savi0 slurm.bwa_all 0 11
+sbatch -p x-gpu-share -J savi24 slurm.savi_all 12 23 
+sbatch -p x-gpu-share -J savi48 slurm.savi_all 24 35
+sbatch -p x-gpu-share -J savi72 slurm.savi_all 36 46 
+```
 # Part4 Copy Number Variation Analysis
 
 

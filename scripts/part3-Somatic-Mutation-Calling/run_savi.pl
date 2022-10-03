@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 #please run this job in a new clear fold
-die "usage: perl maping.pl <Data_Index> <START> <END> \n" if @ARGV!= 3;
+die "usage: perl run_savi.pl <Data_Index> <START> <END> \n" if @ARGV!= 3;
 
 $index_table = $ARGV[0];
 
