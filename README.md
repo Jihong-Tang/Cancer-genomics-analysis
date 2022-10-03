@@ -31,7 +31,16 @@ Cancer Genomics Analysis Pipeline(CGAP): Notes for the computational pipeline fo
 
 # Part0 Introduction and Preparation
 ## 0.1 Introduction
-**UPDATING**
+The in house cancer genomics analysis pipeline starts from the quanlity control of DNA-seq sequencing data. After aligning the sequencing data to different versions of reference genomes, the pipeline identifies the somatic mutations and copy number variations based on the comparisons between normal/blood and tumor tissues. 
+
+The whole analysis pipeline is implemented across four main procedures based on different bioinformatics tools:
+- Sequencing Data Quality Control - [fastp](https://github.com/OpenGene/fastp)
+- Genome Alignment - [bwa](https://github.com/lh3/bwa) and [Picard](https://broadinstitute.github.io/picard/)
+- Somatic Mutations Calling - [SAVI](https://github.com/WangLabHKUST/SAVI)
+- CNV Analysis - [CNVkit](https://cnvkit.readthedocs.io/en/stable/)
+
+The pipeline is initially arranged for the whole exome sequencing(WES) data, but with minor updates on the scripts, it can also be used for the whole genome sequencing(WGS) data. 
+
 ## 0.2 Getting Setup
 ### 0.2.1 Installing Conda Environment
 Anaconda/Miniconda is one powerful and user-friendly package manager for Python. Miniconda is the smaller version of Anaconda with basic functions.
@@ -151,4 +160,12 @@ The folder structure used in this pipeline will be summarized here.
 # Author
 Jihong Tang &lt;jtangbd@connect.ust.hk&gt;instructed by @[Prof. Jiguang Wang](https://github.com/JiguangWang), @[Dr. Quanhua Mu](https://github.com/qhmu) and @[Dong Song](https://github.com/ForceField17)
 # Reference 
+- Part0 Introduction and Preparation
+  - [Conda User Guide](https://docs.conda.io/projects/conda/en/latest/user-guide/index.html)
+  - [Brew User Guide](https://docs.brew.sh/)
+  - [Tom Battaglia's RNAseq-workflow](https://github.com/twbattaglia/RNAseq-workflow)
+- Part1 Sequencing Data Quality Control
+- Part2 Genome Alignment
+- Part3 Somatic Mutation Calling
+- Part4 Copy Number Variation Analysis
 
