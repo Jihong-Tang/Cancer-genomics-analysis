@@ -12,6 +12,7 @@
     - [0.2.3 Setting Up the Folder Structure](#023-setting-up-the-folder-structure)
     - [0.2.4 Creating Cohort Index Files](#024-creating-cohort-index-files)
 - [Part1 Sequencing Data Quality Control](#part1-sequencing-data-quality-control)
+  - [1.1 Setting Up Tools and Environment](#11-setting-up-tools-and-environment)
 - [Part2 Genome Alignment](#part2-genome-alignment)
 - [Part3 Somatic Mutation Calling](#part3-somatic-mutation-calling)
 - [Part4 Copy Number Variation Analysis](#part4-copy-number-variation-analysis)
@@ -153,7 +154,7 @@ The folder structure used in this pipeline will be summarized here.
 ### 0.2.4 Creating Cohort Index Files
 In order to facilitate the cohort data management and parallel processing, we need to create two index files for the WES/WGS sequencing data in this whole pipeline. Both index files are simple .txt files containing the basic naming information for all the sequencing data. 
 
-**Index File 1st**
+**`Index File 1st`**
 
 The first file is used for Sequencing Data QC and Genome Aligenment modules, and it contains three columns, representing row number(0-index), raw name prefix of fastq files, and changed name prefix of bam files, respectively.
 
@@ -178,7 +179,7 @@ The demo index file could be found [here](scripts/list_SP_fq_bwa.txt). It is use
 ...
 ```
 
-**Index File 2nd**
+**`Index File 2nd`**
 
 The second file is used for Somatic Mutation Calling and CNV Analysis modules, and it contains only two columns, representing row number(0-index), and patient prefix resepectively.
 The second index file only needs to contain one index row for each patient, which is different to the first one. 
@@ -194,7 +195,28 @@ Below is the example format and the demo index file could be found [here](script
 ...
 ```
 # Part1 Sequencing Data Quality Control
+## 1.1 Setting Up Tools and Environment
+The main bioinformatics tool used in this module is fastp. The fastp is a tool designed to provide fast all-in-one preprocessing for FastQ files.
+It can automatically filter reads, detect reads adapters, make adapter trimming and output QC results based on the demand. It covers the functions of well known QC tools like FastQC and Trim Galero, and makes the whole preprocessing work automatically in one step, which is very convenient.
+More details about fastp could be found in their [user manual page](https://github.com/OpenGene/fastp). 
 
+fastp could be easily downloaded and installed with bioconda:
+```bash
+# note: the fastp version in bioconda may be not the latest
+conda install -c bioconda fastp
+```
+
+or download the prebuilt binary versions for usage:
+```bash
+# download the latest build
+wget http://opengene.org/fastp/fastp
+chmod a+x ./fastp
+
+# or download specified version, i.e. fastp v0.23.1
+wget http://opengene.org/fastp/fastp.0.23.1
+mv fastp.0.23.1 fastp
+chmod a+x ./fastp
+```
 # Part2 Genome Alignment
 
 # Part3 Somatic Mutation Calling 
@@ -210,6 +232,7 @@ Jihong Tang &lt;jtangbd@connect.ust.hk&gt;instructed by @[Prof. Jiguang Wang](ht
   - [Brew User Guide](https://docs.brew.sh/)
   - [Tom Battaglia's RNAseq-workflow](https://github.com/twbattaglia/RNAseq-workflow)
 - Part1 Sequencing Data Quality Control
+  - Shifu Chen, Yanqing Zhou, Yaru Chen, Jia Gu; fastp: an ultra-fast all-in-one FASTQ preprocessor, Bioinformatics, Volume 34, Issue 17, 1 September 2018, Pages i884–i890, https://doi.org/10.1093/bioinformatics/bty560
 - Part2 Genome Alignment
 - Part3 Somatic Mutation Calling
 - Part4 Copy Number Variation Analysis
