@@ -13,7 +13,8 @@
     - [0.2.4 Creating Cohort Index Files](#024-creating-cohort-index-files)
 - [Part1 Sequencing Data Quality Control](#part1-sequencing-data-quality-control)
   - [1.1 Setting Up Tools](#11-setting-up-tools)
-  - [1.2 Automatic QC with fastp](#12-automatic-qc-with-fastp)
+  - [1.2 FastQ Files Preparation](#12-fastq-files-preparation)
+  - [1.3 Automatic QC with fastp](#13-automatic-qc-with-fastp)
 - [Part2 Genome Alignment](#part2-genome-alignment)
   - [2.1 Setting Up Tools](#21-setting-up-tools)
   - [2.2 Genome Alignment with bwa](#22-genome-alignment-with-bwa)
@@ -223,8 +224,34 @@ wget http://opengene.org/fastp/fastp.0.23.1
 mv fastp.0.23.1 fastp
 chmod a+x ./fastp
 ```
+## 1.2 FastQ Files Preparation
+FastQ file is often used to store the high throughput sequencing reads, and contains useful information including quality scores for each base. 
+Deatiled description about FastQ files could be found [here](https://compgenomr.github.io/book/fasta-and-fastq-formats.html). In order to start the genomics analysis,
+we need to prepare the fastq files for the project. There are mainly two methods to get the fastq files for your project. The first one is producing your own data by sequencing(eg. sequencing service from companies). 
+The second one is downloading data from public database, and it is very useful when you would like to take advantage of the previous work from the community.
 
-## 1.2 Automatic QC with fastp
+However, some datasets in the public database will not contain fastq files, instead, bam files are often contained. In order to control the analysis parameters and pipeline, we could extract the fastq files from the downloaded bam files, and then deal with them with your own pipeline. 
+In order to do so, we could use several different tools, and *SamToFastq* in Picard is taken as example here. 
+
+```bash
+#!/usr/bin/bash
+
+picard=/scratch/PI/jgwang/dsongad/software/Picard/picard.jar
+
+
+NAME=$1
+NEW=$2
+
+# The example script is setted for the HPC3 User in WangLab HKUST
+/scratch/PI/jgwang/dsongad/software/jdk-15.0.2/bin/java -Djava.io.tmpdir=tmp_$NAME \
+        -Xmx36g -XX:+UseParallelGC -XX:ParallelGCThreads=2 \
+        -jar ${picard} SamToFastq \
+        INPUT=../${NAME}.bam \
+        F=${NEW}.R1.fastq \
+        F2=${NEW}.R2.fastq
+```
+
+## 1.3 Automatic QC with fastp
 In order to facilitate the 
 ```bash
 #!/usr/bin/bash
