@@ -284,8 +284,12 @@ fastp -w 2 -i ./$rawName\.R1.fq.gz -o ./$cleanName\.R1.fq.gz \
 rm ./$rawName\.R1.fq.gz ./$rawName\.R2.fq.gz
 ```
 
-**`Script2: run_fastp.pl(Perl script)`**
+**[`Script2: run_fastp.pl(Perl script)`](/scripts/part1-Sequencing-Data-QC/runfastp.pl)**
 
+The script will read in three parameters, and use them as index file path, start index and end index respectively. The previous created index file will be used here to control the parallel processing procedure. The logic is that we could use start index and end index to choose the specific samples to process each time.
+
+For example, when we want to run the first two samples to test the scripts, we could set the start index as 0, the end index as 1. By this way, the perl script will loop from row index 0 to 1 in the index file to read in the index information and pass them to the bash script. 
+Then the bash script will process the two samples one by one based on the parameters received. 
 ```perl
 #!/usr/bin/perl
 
@@ -308,20 +312,29 @@ while($line = <INDEX>){
 }
 close INDEX;
 
-#`mkdir Dir_tmp_1`;
-#chdir "./Dir_tmp_1";
 
 $start = $ARGV[1];
 $end = $ARGV[2];
 
-for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
-        `sh ./do_fastp.sh $sample[$j][0] $sample[$j][0]`;
+for($j=$start;$j<=$end;$j++){         
+        `sh ./do_fastp.sh $sample[$j][0] $sample[$j][0]`; # Important command, call the bash script based on parameters
 	$completed_No = $j;
         print "Job completed!!! No.$completed_No : $sample[$j][1]\t$sample[$j][0]\n\n";
 }
 ```
 
 ### 1.3.2 Scripts Usage Examples
+For simple usage or script test, we could directly run the perl script with index paramters. It is highly recommended to record all the log information by redirecting them to another log file. 
+
+The example command used to call perl script for simple test usage could be shown as follows. The command will call the scripts to do fastp work on the first sample only and store the log information into the subfoler *log*.
+
+```bash
+perl run_fastp.pl list_SP_fq_bwa.txt 0 0 2>./log/log.fp_0_0
+```
+
+**[`Script3: slurm.fp_all(Slurm script)`](/scripts/part1-Sequencing-Data-QC/slurm.fp_all)**
+
+For the slurm cluster users to run multiple samples, the example sbatch script could be arranged as follows. 
 ```bash
 #!/bin/bash
 ##SBATCH -J bwa24  #Slurm job name
@@ -337,6 +350,7 @@ for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
 perl runfastp.pl list_SP_fq_bwa.txt $1 $2 2>./log/log.fp_$1_$2
 ```
 
+Taken the demo project as example, there are totally 94(0-93) samples in the index files, and we could process them parallelly on four computing nodes as follows:
 ```bash
 sbatch -p x-gpu-share -J fp0 slurm.fp_all 0 23 
 sbatch -p x-gpu-share -J fp24 slurm.fp_all 24 47 
