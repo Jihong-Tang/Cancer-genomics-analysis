@@ -15,6 +15,8 @@
   - [1.1 Setting Up Tools](#11-setting-up-tools)
   - [1.2 FastQ Files Preparation](#12-fastq-files-preparation)
   - [1.3 Automatic QC with fastp](#13-automatic-qc-with-fastp)
+    - [1.3.1 Working Scripts](#131-working-scripts)
+    - [1.3.2 Scripts Usage Examples](#132-scripts-usage-examples)
 - [Part2 Genome Alignment](#part2-genome-alignment)
   - [2.1 Setting Up Tools](#21-setting-up-tools)
   - [2.2 Genome Alignment with bwa](#22-genome-alignment-with-bwa)
@@ -252,7 +254,18 @@ NEW=$2
 ```
 
 ## 1.3 Automatic QC with fastp
-In order to facilitate the 
+In order to facilitate the parallel processing of multiple samples and make the pipeline reproducible, we could summarize the commands in scripts. All the scripts we created in this whole pipeline are template structured, which will read parameters from the command line if we use them individually. 
+In this way, we only need to change several simple parameters to control the whole pipeline to deal with different samples. 
+
+The arrangement logic of the scripts for part 1-3 is the same and can be summarized as follows. For each step, one bash script and one perl script will be used. The bash script contains the detailed command to use different bioinformatics tools, eg. fastp in this step. The required parameters of the bash script often determines which sample will be processed each time. 
+
+The perl script contains the template structure to read in the index files we created in the above [section](#024-creating-cohort-index-files), the detailed command to run the bash script and how to control the parallel processing procedure. The perl script often requires the path of the index file, the working directory, the start index and end index to the working samples as parameters. 
+
+### 1.3.1 Working Scripts
+**`Script1: do_fastp.sh(Bash script)`**
+The script will read in two parameters, and use them as the raw name prefix of fastq files and the changed name prefix. The paired fastq files are expected to end with suffix *.R1.fq.gz* and *.R2.fq.gz* to use this script, and the script can also be modified based on your own file naming style. 
+
+The QC results will be stored in the subfoler *qc_res*, and the raw fastq files will be removed after the automatic preprocessing. 
 ```bash
 #!/usr/bin/bash
 
@@ -269,6 +282,8 @@ fastp -w 2 -i ./$rawName\.R1.fq.gz -o ./$cleanName\.R1.fq.gz \
 
 rm ./$rawName\.R1.fq.gz ./$rawName\.R2.fq.gz
 ```
+
+**`Script2: run_fastp.pl(Perl script)`**
 
 ```perl
 #!/usr/bin/perl
@@ -305,6 +320,7 @@ for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
 }
 ```
 
+### 1.3.2 Scripts Usage Examples
 ```bash
 #!/bin/bash
 ##SBATCH -J bwa24  #Slurm job name
