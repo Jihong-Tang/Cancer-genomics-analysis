@@ -262,7 +262,8 @@ The arrangement logic of the scripts for part 1-3 is the same and can be summari
 The perl script contains the template structure to read in the index files we created in the above [section](#024-creating-cohort-index-files), the detailed command to run the bash script and how to control the parallel processing procedure. The perl script often requires the path of the index file, the working directory, the start index and end index to the working samples as parameters. 
 
 ### 1.3.1 Working Scripts
-**`Script1: do_fastp.sh(Bash script)`**
+**[`Script1: do_fastp.sh(Bash script)`](/scripts/part1-Sequencing-Data-QC/do_fastp.sh)**
+
 The script will read in two parameters, and use them as the raw name prefix of fastq files and the changed name prefix. The paired fastq files are expected to end with suffix *.R1.fq.gz* and *.R2.fq.gz* to use this script, and the script can also be modified based on your own file naming style. 
 
 The QC results will be stored in the subfoler *qc_res*, and the raw fastq files will be removed after the automatic preprocessing. 
