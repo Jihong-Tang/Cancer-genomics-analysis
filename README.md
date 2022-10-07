@@ -360,7 +360,8 @@ sbatch -p x-gpu-share -J fp72 slurm.fp_all 72 93
 # Part2 Genome Alignment
 
 ## 2.1 Setting Up Tools
-
+Genome alignment and following duplicated marking are essential steps in the genomics analysis pipeline to get the bam files. The Bam files are the binary version of Sam files, and the Sam files are tab-delimited text file that contains sequence alignment data. 
+Detailed information about SAM/BAM files could be found [here](http://samtools.github.io/hts-specs/).
 ## 2.2 Genome Alignment with bwa
 
 ```bash
