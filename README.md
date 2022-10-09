@@ -20,11 +20,24 @@
 - [Part2 Genome Alignment](#part2-genome-alignment)
   - [2.1 Setting Up Tools](#21-setting-up-tools)
   - [2.2 Genome Alignment with bwa](#22-genome-alignment-with-bwa)
+    - [2.2.1 Working Scripts](#221-working-scripts)
+    - [2.2.2 Scripts Usage Example](#222-scripts-usage-example)
   - [2.3 Mark Duplicates with Picard](#23-mark-duplicates-with-picard)
+    - [2.3.1 Working Scripts](#231-working-scripts)
+    - [2.3.2 Scripts Usage Example](#232-scripts-usage-example)
 - [Part3 Somatic Mutation Calling](#part3-somatic-mutation-calling)
   - [3.1 Setting Up Tools](#31-setting-up-tools)
   - [3.2 Somatic Mutations Calling with SAVI](#32-somatic-mutations-calling-with-savi)
 - [Part4 Copy Number Variation Analysis](#part4-copy-number-variation-analysis)
+  - [4.1 Preparation of input files](#41-preparation-of-input-files)
+    - [4.1.1 Conda environment](#411-conda-environment)
+    - [4.1.2 Access file for reference genome](#412-access-file-for-reference-genome)
+    - [4.1.3 Baits file](#413-baits-file)
+    - [4.1.4 Target and Antitarget bed files](#414-target-and-antitarget-bed-files)
+  - [4.2 CNVkit Commands](#42-cnvkit-commands)
+    - [4.2.1 Coverage](#421-coverage)
+    - [4.2.2 Reference;Fix;Segment;Export](#422-referencefixsegmentexport)
+  - [4.3 CNV Profile Generation](#43-cnv-profile-generation)
 - [Author](#author)
 - [Reference](#reference)
 
@@ -362,8 +375,35 @@ sbatch -p x-gpu-share -J fp72 slurm.fp_all 72 93
 ## 2.1 Setting Up Tools
 Genome alignment and following duplicated marking are essential steps in the genomics analysis pipeline to get the bam files. The Bam files are the binary version of Sam files, and the Sam files are tab-delimited text file that contains sequence alignment data. 
 Detailed information about SAM/BAM files could be found [here](http://samtools.github.io/hts-specs/).
-## 2.2 Genome Alignment with bwa
 
+The bioinformatics tools used in this module are bwa and Picard. Bwa is one of the most famous alignment tools, and is considered as the most useful one. Detailed information about the bwa tools can be found [here](https://github.com/lh3/bwa).
+
+Bwa can also be installed easily through conda:
+```bash
+conda install -c bioconda bwa
+```
+In addition, bwa can be installed as follows:
+```bash
+git clone https://github.com/lh3/bwa.git
+cd bwa; make
+./bwa index ref.fa
+./bwa mem ref.fa read-se.fq.gz | gzip -3 > aln-se.sam.gz
+./bwa mem ref.fa read1.fq read2.fq | gzip -3 > aln-pe.sam.gz
+```
+
+Picard is a set of Java command line tools for manipulating high-throughput sequencing (HTS) data and formats. Well noted manual and notes have been provided by the developers, and they can be found [here](https://broadinstitute.github.io/picard/).
+It is highly recommended to follow their instructions to download and install the Picard and set up java in order to use specific commands. 
+
+For WangLab HKUST HPC3 users, the Picard tool can be used by linking to the following path:
+```bash
+/scratch/PI/jgwang/dsongad/software/Picard/picard.jar
+```
+## 2.2 Genome Alignment with bwa
+The scripts arrangement logic is the same as previously stated in the section [1.3 Automatic QC with fastp](#13-automatic-qc-with-fastp). 
+### 2.2.1 Working Scripts
+**[`Script1: do_bwa_dna.sh(Bash script)`](/scripts/part2-Genome-Alignment/do_bwa_dna.sh)**
+The script is expected to receive four parameters from user input, representing sample ID, R1 fastq file name, R2 fastq file name and user defined result bam prefix name.
+The alignment result bam will be sorted and indexed after the bwa commands, and only the sorted bam will be remained, accompanied by its own index .bai file. 
 ```bash
 #!/usr/bin/bash
 A='WangLab'
@@ -404,6 +444,11 @@ echo [deltat] $(( $time2 - $time1 ))
 echo [End]
 ```
 
+**[`Script2: run_bwa_mapping.pl(Perl script)`](/scripts/part2-Genome-Alignment/run_bwa_mapping.pl)**
+The script will read in four parameters, and use them as index file path, fastq file path, start index and end index respectively. 
+The previous created index file will be used here to control the parallel processing procedure. The logic is that we could use start index and end index to choose the specific samples to process each time. 
+
+The parameter `<fastq-dir>` is essential to be provided to locate the fastq files, and user can choose to delete the raw fastq files after alignment for storage room saving. 
 ```perl
 #!/usr/bin/perl
 
@@ -440,6 +485,17 @@ for($j=$start;$j<=$end;$j++){
 #chdir "../";
 ```
 
+### 2.2.2 Scripts Usage Example
+For simple usage or script test, we could directly run the perl script with index paramters. It is highly recommended to record all the log information by redirecting them to another log file. 
+
+The example command used to call perl script for simple test usage could be shown as follows. The command will call the scripts to do bwa mapping on the first sample only and store the log information into the subfoler *log*.
+
+```bash
+perl run_bwa_mapping.pl list_SP_fq_bwa.txt 0 0 2>./log/log.bwa_0_0
+```
+
+**[`Script3: slurm.bwa_all(Slurm script)`](/scripts/part1-Sequencing-Data-QC/slurm.bwa_all)**
+For the slurm cluster users to run multiple samples, the example sbatch script could be arranged as follows.
 ```bash
 #!/bin/bash
 ##SBATCH -J bwa24  #Slurm job name
@@ -454,7 +510,7 @@ for($j=$start;$j<=$end;$j++){
 
 perl run_bwa_mapping.pl list_SP_fq_bwa.txt ../all_fq $1 $2 2>./log/log.bwa_$1_$2
 ```
-
+Taken the demo project as example, there are totally 94(0-93) samples in the index files, and we could process them parallelly on four computing nodes as follows:
 ```bash
 sbatch -p x-gpu-share -J bwa0 slurm.bwa_all 0 23 
 sbatch -p x-gpu-share -J bwa24 slurm.bwa_all 24 47 
@@ -462,7 +518,13 @@ sbatch -p x-gpu-share -J bwa48 slurm.bwa_all 48 71
 sbatch -p x-gpu-share -J bwa72 slurm.bwa_all 72 93 
 ```
 ## 2.3 Mark Duplicates with Picard
+The scripts arrangement logic is the same as previously stated in the section [1.3 Automatic QC with fastp](#13-automatic-qc-with-fastp). 
+### 2.3.1 Working Scripts
+**[`Script1: do_mark_duplicates.sh(Bash script)`](/scripts/part2-Genome-Alignment/do_mark_duplicates.sh)**
+The script is expected to receive only one parameter from user input, the prefix name of the bam file. After the mark duplicates work, the bam files will be ended with .MD. surfix, and the .MD.bam files will be sorted and indexed again. 
+The raw bam files will be removed and only the .MD.bam and .MD.bam.bai files will be remained. 
 
+One important note: The mark duplicates step is implemented in the same directory after the bwa mapping step, and must be used in the same folder if no change is made to the script.
 ```bash
 #!/usr/bin/bash
 
@@ -490,6 +552,11 @@ rm ${NAME}.sorted.bam.bai
 samtools index ${NAME}.sorted.MD.bam
 #rm ${NAME}.sorted.MD.bam.txt
 ```
+**[`Script2: run_mark_duplicates.pl(Perl script)`](/scripts/part2-Genome-Alignment/run_mark_duplicates.pl)**
+The script will read in four parameters, and use them as index file path, fastq file path, start index and end index respectively. 
+The previous created index file will be used here to control the parallel processing procedure. The logic is that we could use start index and end index to choose the specific samples to process each time. 
+
+The parameter setting is the same to the script `run_bwa_mapping.pl` in order to simplify the usage of the index files. 
 
 ```perl
 #!/usr/bin/perl
@@ -526,6 +593,18 @@ for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
 }
 #chdir "../";
 ```
+### 2.3.2 Scripts Usage Example
+For simple usage or script test, we could directly run the perl script with index paramters. It is highly recommended to record all the log information by redirecting them to another log file. 
+
+The example command used to call perl script for simple test usage could be shown as follows. The command will call the scripts to do picard duplicates marking on the first sample only and store the log information into the subfoler *log*.
+
+```bash
+perl run_mark_duplicates.pl list_SP_fq_bwa.txt 0 0 2>./log/log.md_0_0
+```
+
+**[`Script3: slurm.md_all(Slurm script)`](/scripts/part1-Sequencing-Data-QC/slurm.md_all)**
+For the slurm cluster users to run multiple samples, the example sbatch script could be arranged as follows.
+
 
 ```bash
 #!/bin/bash
@@ -541,7 +620,7 @@ for($j=$start;$j<=$end;$j++){          #run the first 100 samples as a try
 
 perl run_mark_duplicates.pl list_SP_fq_bwa.txt ./ $1 $2 2>./log/log.md_$1_$2
 ```
-
+Taken the demo project as example, there are totally 94(0-93) samples in the index files, and we could process them parallelly on four computing nodes as follows:
 ```bash
 sbatch -p x-gpu-share -J md0 slurm.md_all 0 23 
 sbatch -p x-gpu-share -J md24 slurm.md_all 24 47 
@@ -675,6 +754,161 @@ sbatch -p x-gpu-share -J savi72 slurm.savi_all 36 46
 ```
 # Part4 Copy Number Variation Analysis
 
+[5._109.07.08-2_湯硯安博士-51.pdf](CNVkit%20pipeline%208760af4ce2ce4cfaa5410789947fa423/5._109.07.08-2_%25E6%25B9%25AF%25E7%25A1%25AF%25E5%25AE%2589%25E5%258D%259A%25E5%25A3%25AB-51.pdf)
+
+[https://cnvkit.readthedocs.io/en/stable/pipeline.html](https://cnvkit.readthedocs.io/en/stable/pipeline.html)
+
+## 4.1 Preparation of input files
+
+### 4.1.1 Conda environment
+
+### 4.1.2 Access file for reference genome
+
+Baits files and Access files,
+
+For access file, hg38 and hg19 should use different calculated bed files. The calculate command is shown as follows;
+
+```bash
+cnvkit.py access /scratch/PI/jgwang/jtangbd/reference/hg19bwa/hg19.fa \
+-o access.hg19.bed
+```
+
+### 4.1.3 Baits file
+
+### 4.1.4 Target and Antitarget bed files
+
+```bash
+cnvkit.py autobin ../all_mapping_hg19/*B*.bam \
+-t S07604514_Regions_hg19_220825.bed \
+-g access.hg19.bed \
+--target-output-bed SP_20220910_binauto.target.bed \
+--antitarget-output-bed SP_20220910_binauto.antitarget.bed \
+2>log/log_autobin_auto
+```
+
+## 4.2 CNVkit Commands
+
+![CNVkit Pipeline](/cnvkit_workflow.webp)
+
+### 4.2.1 Coverage
+
+For each bam file, we need to calculate the coverage for target and antitarget regions, therefore, there will be two .cnn file as results for each bam file. 
+
+```bash
+#!/bin/bash
+
+PathBam=/scratch/PI/jgwang/jtangbd/projects/SP_WES/all_mapping_hg19
+PathCNV=/scratch/PI/jgwang/jtangbd/projects/SP_WES/cnvkit_hg19
+
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        #i=`echo $n | cut -d "\t" -f 2`
+        cnvkit.py coverage ${PathBam}/$i\_B_WES_hg19.sorted.MD.bam SP_20220910_binauto.target.bed -p 20 -o ${PathCNV}/coverage/$i\_B.target.cnn
+done
+
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        #i=`echo $n | cut -d "\t" -f 2`
+        cnvkit.py coverage ${PathBam}/$i\_B_WES_hg19.sorted.MD.bam SP_20220910_binauto.antitarget.bed -p 20 -o ${PathCNV}/coverage/$i\_B.antitarget.cnn
+done
+
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        #i=`echo $n | cut -d "\t" -f 2`
+        cnvkit.py coverage ${PathBam}/$i\_T_WES_hg19.sorted.MD.bam SP_20220910_binauto.target.bed -p 20 -o ${PathCNV}/coverage/$i\_T.target.cnn
+done
+
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        #i=`echo $n | cut -d "\t" -f 2`
+        cnvkit.py coverage ${PathBam}/$i\_T_WES_hg19.sorted.MD.bam SP_20220910_binauto.antitarget.bed -p 20 -o ${PathCNV}/coverage/$i\_T.antitarget.cnn
+done
+```
+
+### 4.2.2 Reference;Fix;Segment;Export
+
+The total pipeline for step 2 to 5 could be summarized in the following bash scripts
+
+```bash
+#!/bin/bash
+
+PathCoverage=/scratch/PI/jgwang/jtangbd/projects/SP_WES/cnvkit_hg19/coverage
+FileReference=/scratch/PI/jgwang/jtangbd/reference/hg19bwa/hg19.fa
+# step0 - make target and antitarget files
+# step1 - cnvkit coverage for all samples
+
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        # step2 - cnvkit reference for paired sample
+        cnvkit.py reference ${PathCoverage}/$i\_B*.cnn -f ${FileReference} -o ./reference/$i\_reference.cnn
+
+        # step3 - cnvkit fix
+        cnvkit.py fix  ${PathCoverage}/$i\_T.target.cnn  ${PathCoverage}/$i\_T.antitarget.cnn ./reference/$i\_reference.cnn -i $i -o ./subtraction/$i\_fix.cnr
+
+        # step4 - cnvkit segment
+        cnvkit.py segment subtraction/$i\_fix.cnr -p 20 --drop-low-coverage -m cbs -t 0.000001 -o ./segmentation/$i\_segment.cbs.cns
+
+        # step5 - cnvkit export and transfer results to seg files
+        cnvkit.py call ./segmentation/$i\_segment.cbs.cns -o ./results/$i\_call.cbs.cns
+        cnvkit.py export seg ./results/$i\_call.cbs.cns -o ./results/$i\_cbs.seg
+
+        #tail -n+2 ./results/$i\_cbs.seg >> ./results/CNV_CGPA_103samples_pair_ref.seg
+done
+```
+
+## 4.3 CNV Profile Generation
+
+```bash
+# Generate hg19 gene lists from gencode gtf files 
+cat gencode.v41lift37.annotation.gtf | sed '/^#/d' | awk '$3=="gene"' | \
+awk -F "\t" '{split($9, a, ";"); OFS="\t"; print $1, $4, $5, $7, a[2], a[3]}' | \
+awk -F "\t" '{split($5, b, " "); split($6, c, " "); OFS="\t"; print $1,$2,$3,$4,b[2],c[2]}' | \
+sed 's/"//g' > GRCh37_gencode_v41_genes.txt
+```
+
+```bash
+# Generate Protein coding genes without sex chromosome genes
+cat GRCh37_gencode_v41_genes.txt | sed '/chr[X|Y]/d' | awk '$5=="protein_coding"' \
+> GRCh37_gencode_v41_genes_Protein_noSex.txt
+```
+
+```bash
+# sort CNV result file for a single sample 
+cat GRCh37_gencode_v41_genes_Protein_noSex.txt | sort -k1,1 -k2,2n > GRCh37_gencode_v41_genes_Protein_noSex_sort.txt
+
+cat ../results/P370376_cbs.seg | awk '{OFS="\t"; print $2,$3,$4,$5,$6,$1}' | \
+sort -k1,1 -k2,2n > P370376_sort.bed
+```
+
+```bash
+# Map for single sample
+bedtools map -a GRCh37_gencode_v41_genes_Protein_noSex_sort.txt \
+-b P370376_sort.bed -c 5 | awk '{print $6"\t"$7}' | sort -k1 | \
+sed "1s/^/gene\t$var1\n/" > P370376_CNVprofile.txt
+```
+
+The total bash script:
+
+```bash
+#!/bin/bash
+
+PathSeg=/scratch/PI/jgwang/jtangbd/projects/SP_WES/cnvkit_hg19/results
+
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        #i=`echo $n | cut -d "\t" -f 2`
+        cat ${PathSeg}/${i}\_cbs.seg | awk '{OFS="\t"; print $2,$3,$4,$5,$6,$1}' | \
+        sort -k1,1 -k2,2n > ./sort/${i}\_sort.bed
+        # Map for single sample
+        var1=${i}
+        bedtools map -a GRCh37_gencode_v41_genes_Protein_noSex_sort.txt -b ./sort/${i}\_sort.bed -c 5 | \
+        awk '{print $6"\t"$7}' | sort -k1 | \sed "1s/^/gene\t$var1\n/" > ./profile/${i}\_CNVprofile.txt
+done
+
+mkdir -p tmp
+cut -f1 ./profile/P370376_CNVprofile.txt > gn.txt 
+for i in `cut -f2 list_SP_savi_CNV.txt`;do
+        cut -f2 ./profile/${i}\_CNVprofile.txt > ./tmp/tmp.${i}
+done
+paste -d "\t" ./tmp/tmp* > tmp.txt 
+paste -d "\t" gn.txt tmp.txt > SP_46samples_CNVPatients.txt
+rm gn.txt tmp.txt
+```
+
 
 # Author
 Jihong Tang &lt;jtangbd@connect.ust.hk&gt;instructed by @[Prof. Jiguang Wang](https://github.com/JiguangWang), @[Dr. Quanhua Mu](https://github.com/qhmu) and @[Dong Song](https://github.com/ForceField17)
@@ -686,6 +920,8 @@ Jihong Tang &lt;jtangbd@connect.ust.hk&gt;instructed by @[Prof. Jiguang Wang](ht
 - Part1 Sequencing Data Quality Control
   - Shifu Chen, Yanqing Zhou, Yaru Chen, Jia Gu; fastp: an ultra-fast all-in-one FASTQ preprocessor, Bioinformatics, Volume 34, Issue 17, 1 September 2018, Pages i884–i890, https://doi.org/10.1093/bioinformatics/bty560
 - Part2 Genome Alignment
+  - Li H. and Durbin R. (2009) Fast and accurate short read alignment with Burrows-Wheeler Transform. Bioinformatics, 25:1754-60. [PMID: 19451168]
+  - “Picard Toolkit.” 2019. Broad Institute, GitHub Repository. https://broadinstitute.github.io/picard/; Broad Institute
 - Part3 Somatic Mutation Calling
 - Part4 Copy Number Variation Analysis
 
